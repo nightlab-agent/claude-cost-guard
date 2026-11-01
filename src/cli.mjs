@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  applicable, clearBudget, entriesOf, evaluate, extendBudget, fmtAmount, limitKeys, loadBudgets, parseAmount, saveBudgets, setBudget,
+  applicable, clearBudget, entriesOf, evaluate, extendBudget, fmtAmount, limitKeys, loadBudgets, modelMatches, parseAmount, saveBudgets, setBudget,
 } from "./budgets.mjs";
 import { syncMarks } from "./hook.mjs";
 import { RETAIN_DAYS, refresh } from "./index.mjs";
@@ -215,7 +215,13 @@ function cmdBudget(args, ctx) {
     ctx.io.out(`Budget set for ${label}: ${[target.daily && `daily ${fmtAmount(target.daily)}`, target.weekly && `weekly ${fmtAmount(target.weekly)}`].filter(Boolean).join(", ")} (${target.mode}).`);
     if (dir && !fs.existsSync(dir)) ctx.io.out(`Note: ${dir} does not exist on this machine (the budget applies to sessions that ran there).`);
     const scopeKey = model ? (dir ? `${normPath(dir)}|model:${model.trim().toLowerCase()}` : `model:${model.trim().toLowerCase()}`) : scopeKeyOf(dir);
-    showUsage(ctx, cfg, b, [scopeKey]); // also leaves the index warm for the first prompt
+    const caught = catchUp(ctx);
+    if (model) {
+      const seen = caught.idx.models;
+      if (!seen.length) ctx.io.out("Note: no sessions found yet, so the name could not be checked. The budget is saved and counts a model once one matches.");
+      else if (!seen.some((m) => modelMatches(model, m))) ctx.io.out(`Note: no model in your history contains "${model.trim()}" (models seen: ${seen.join(", ")}). The budget is saved and counts a model once one matches.`);
+    }
+    showUsage(ctx, cfg, b, [scopeKey], { caught }); // also leaves the index warm for the first prompt
     const hint = hookHint(cfg);
     if (hint) ctx.io.out(hint);
     return 0;
@@ -262,8 +268,8 @@ function cmdBudget(args, ctx) {
 
 // One line per budget: its limits (with today's extension) and how full they are. `only` limits it to some budget keys
 // (null: all). Unless told not to, the thresholds already reached count as announced from now on (see syncMarks).
-function showUsage(ctx, cfg, b, only, { track = true } = {}) {
-  const { idx, notes } = catchUp(ctx);
+function showUsage(ctx, cfg, b, only, { track = true, caught } = {}) {
+  const { idx, notes } = caught || catchUp(ctx);
   const { today, cells } = weekCells(idx, ctx.now);
   const all = evaluate(cells, entriesOf(b), today);
   const entries = entriesOf(b).filter((e) => !only || only.includes(e.key));

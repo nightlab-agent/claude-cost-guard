@@ -4,6 +4,8 @@ All notable changes to Claude cost guard are written here. The format follows [K
 
 ## [Unreleased]
 
+- `budget set --model <name>` notes when the name matches no model in your history, and lists the models it has seen, so a typo such as `--model opuss` no longer saves a budget that silently never applies. The budget is still saved; with no sessions yet, it says the name could not be checked. ([#5](https://github.com/nrzz/claude-cost-guard/issues/5))
+
 ## [1.1.0] - 2026-10-28
 
 - `budget set --daily 10usd --model opus` sets a budget for one model: `--model <name>` is a case-insensitive part of the model id in the transcript (`opus`, `sonnet`, `claude-opus-5-5`), alone or with `--project <dir>`. It sits next to the all-projects and project budgets, all of which apply; the first limit a prompt reaches speaks, and a hard-mode block names the model and suggests `budget extend <amount> --model <name>`. `budget clear` and `budget extend` take `--model` too, and `show`, `today` and `statusline` list the model budgets with the others.

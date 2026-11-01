@@ -426,6 +426,41 @@ test("budget set, show, extend, and clear with --model", async () => {
   } finally { box.cleanup(); }
 });
 
+test("budget set --model notes a name that matches no model in the history, and still saves it", async () => {
+  const box = world();
+  try {
+    const r = await budget(box, "set", "--daily", "10usd", "--model", "opuss");
+    assert.equal(r.code, 0, r.err);
+    const lines = r.out.split("\n");
+    assert.equal(lines[0], "Budget set for opuss: daily $10 (soft).");
+    assert.match(lines[1], /^Note: no model in your history contains "opuss" \(models seen: [^)]+\)\. The budget is saved and counts a model once one matches\.$/);
+    for (const m of ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-4-5-20251001", "claude-opus-4-6", "claude-fable-5-1"]) assert.ok(lines[1].includes(m), m);
+    assert.match(lines[2], /^ {2}opuss +today \$0(?:\.00)? of \$10 \(0%\) +\[soft\]/);
+    assert.ok(loadBudgets(box.cfg).models.some((m) => m.model === "opuss" && m.daily), "saved");
+  } finally { box.cleanup(); }
+});
+
+test("budget set --model says nothing extra when the name matches a model", async () => {
+  const box = world();
+  try {
+    for (const name of ["opus", "OPUS", "claude-sonnet-5-5"]) {
+      const r = await budget(box, "set", "--daily", "10usd", "--model", name);
+      assert.equal(r.code, 0, r.err);
+      assert.doesNotMatch(r.out, /Note:/, name);
+    }
+  } finally { box.cleanup(); }
+});
+
+test("budget set --model on a machine with no sessions yet says the name could not be checked", async () => {
+  const box = sandbox();
+  try {
+    const r = await budget(box, "set", "--daily", "10usd", "--model", "opus");
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /^Note: no sessions found yet, so the name could not be checked\. The budget is saved and counts a model once one matches\.$/m);
+    assert.doesNotMatch(r.out, /models seen/);
+  } finally { box.cleanup(); }
+});
+
 test("today and statusline display per-model budget when active", async () => {
   const box = world();
   try {
