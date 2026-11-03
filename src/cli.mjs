@@ -186,6 +186,13 @@ function hookHint(cfg) {
   return installed || enabledPlugins(s.data).length ? null : "The guard is not installed in Claude Code yet: run  claude-cost-guard init  (or install the plugin) and it will speak up there.";
 }
 
+// The words both budget set and budget show use when a model budget's name is in none of the models seen, or null
+// when one matches (with no models seen there is nothing to check against: the callers say so or stay quiet).
+function unmatchedModel(model, seen) {
+  if (seen.some((m) => modelMatches(model, m))) return null;
+  return `no model in your history contains "${model.trim()}" (models seen: ${seen.join(", ")}).`;
+}
+
 function cmdBudget(args, ctx) {
   const sub = args._[0] || "show";
   const cfg = configDir(ctx.env);
@@ -219,7 +226,10 @@ function cmdBudget(args, ctx) {
     if (model) {
       const seen = caught.idx.models;
       if (!seen.length) ctx.io.out("Note: no sessions found yet, so the name could not be checked. The budget is saved and counts a model once one matches.");
-      else if (!seen.some((m) => modelMatches(model, m))) ctx.io.out(`Note: no model in your history contains "${model.trim()}" (models seen: ${seen.join(", ")}). The budget is saved and counts a model once one matches.`);
+      else {
+        const unmatched = unmatchedModel(model, seen);
+        if (unmatched) ctx.io.out(`Note: ${unmatched} The budget is saved and counts a model once one matches.`);
+      }
     }
     showUsage(ctx, cfg, b, [scopeKey], { caught }); // also leaves the index warm for the first prompt
     const hint = hookHint(cfg);
@@ -235,7 +245,16 @@ function cmdBudget(args, ctx) {
       return 0;
     }
     ctx.io.out(`Budgets (${budgetsFile(cfg)})`);
-    showUsage(ctx, cfg, b, null, { track: false });
+    const caught = catchUp(ctx);
+    showUsage(ctx, cfg, b, null, { track: false, caught });
+    const seen = caught.idx.models;
+    const names = new Set();
+    for (const e of entries) {
+      if (!e.model || !seen.length || names.has(e.model.toLowerCase())) continue;
+      names.add(e.model.toLowerCase());
+      const unmatched = unmatchedModel(e.model, seen);
+      if (unmatched) ctx.io.out(`Note: ${unmatched} That budget counts nothing until one matches.`);
+    }
     return 0;
   }
 

@@ -461,6 +461,68 @@ test("budget set --model on a machine with no sessions yet says the name could n
   } finally { box.cleanup(); }
 });
 
+test("budget show notes a model budget that matches no model in the history", async () => {
+  const box = world();
+  try {
+    await budget(box, "set", "--daily", "10usd", "--model", "opuss");
+    const r = await budget(box, "show");
+    assert.equal(r.code, 0, r.err);
+    const lines = r.out.split("\n").filter(Boolean);
+    assert.match(lines[0], /^Budgets \(/);
+    assert.match(lines[1], /^ {2}opuss +today \$0(?:\.00)? of \$10 \(0%\) +\[soft\]/);
+    const notes = lines.filter((l) => l.startsWith("Note: no model"));
+    assert.equal(notes.length, 1, r.out);
+    assert.match(notes[0], /^Note: no model in your history contains "opuss" \(models seen: [^)]+\)\. That budget counts nothing until one matches\.$/);
+    assert.ok(lines.indexOf(notes[0]) > 1, "after the budget lines");
+    assert.ok(loadBudgets(box.cfg).models.some((m) => m.model === "opuss" && m.daily), "left as saved");
+  } finally { box.cleanup(); }
+});
+
+test("budget show says nothing extra for a model budget that matches, or a budget with no model", async () => {
+  const box = world();
+  try {
+    await budget(box, "set", "--daily", "15usd");
+    await budget(box, "set", "--daily", "10usd", "--model", "opus");
+    const r = await budget(box, "show");
+    assert.equal(r.code, 0, r.err);
+    assert.doesNotMatch(r.out, /no model in your history/);
+  } finally { box.cleanup(); }
+});
+
+test("budget show notes only the model budget that matches nothing, once", async () => {
+  const box = world();
+  try {
+    await budget(box, "set", "--daily", "10usd", "--model", "opus");
+    await budget(box, "set", "--daily", "10usd", "--model", "opuss");
+    const r = await budget(box, "show");
+    assert.equal(r.code, 0, r.err);
+    const notes = r.out.split("\n").filter((l) => l.startsWith("Note: no model"));
+    assert.equal(notes.length, 1, r.out);
+    assert.ok(notes[0].includes('"opuss"'), notes[0]);
+  } finally { box.cleanup(); }
+});
+
+test("budget show notes an unmatched name once when two budgets share it", async () => {
+  const box = world();
+  try {
+    await budget(box, "set", "--daily", "10usd", "--model", "opuss");
+    await budget(box, "set", "--daily", "5usd", "--model", "OPUSS", "--project", box.home);
+    const r = await budget(box, "show");
+    assert.equal(r.code, 0, r.err);
+    assert.equal(r.out.split("\n").filter((l) => l.startsWith("Note: no model")).length, 1, r.out);
+  } finally { box.cleanup(); }
+});
+
+test("budget show on a machine with no sessions yet notes nothing about model names", async () => {
+  const box = sandbox();
+  try {
+    await budget(box, "set", "--daily", "10usd", "--model", "opuss");
+    const r = await budget(box, "show");
+    assert.equal(r.code, 0, r.err);
+    assert.doesNotMatch(r.out, /no model in your history|no sessions found yet/);
+  } finally { box.cleanup(); }
+});
+
 test("today and statusline display per-model budget when active", async () => {
   const box = world();
   try {

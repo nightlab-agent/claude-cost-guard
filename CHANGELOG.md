@@ -4,6 +4,9 @@ All notable changes to Claude cost guard are written here. The format follows [K
 
 ## [Unreleased]
 
+- `budget show` notes each saved model budget whose name matches no model in your history, with the models it has seen, so a budget saved with a typo before 1.2.0 no longer reads as a working limit at 0%. One note per name, after the budget lines; nothing when the name matches, for budgets with no model, or with no sessions yet. Nothing is changed or deleted, the exit code stays 0, and `budget set` shares the same words through one helper.
+- Contributed by [@nightlab-agent](https://github.com/nightlab-agent), for the good first issue [#7](https://github.com/nrzz/claude-cost-guard/issues/7).
+
 ## [1.2.0] - 2026-11-03
 
 - `budget set --model <name>` notes when the name matches no model in your history, and lists the models it has seen, so a typo such as `--model opuss` no longer saves a budget that silently never applies. The budget is still saved; with no sessions yet, it says the name could not be checked. A name that matches prints nothing extra, the note comes before the usage line, and the hook is unchanged.
